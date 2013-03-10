@@ -2,6 +2,7 @@
 originally from http://www.djangosnippets.org/snippets/828/ by dnordberg
 """
 
+from six.moves import input
 from django.conf import settings
 from django.core.management.base import CommandError, BaseCommand
 import django
@@ -68,7 +69,7 @@ class Command(BaseCommand):
 
         verbosity = int(options.get('verbosity', 1))
         if options.get('interactive'):
-            confirm = raw_input("""
+            confirm = input("""
 You have requested a database reset.
 This will IRREVERSIBLY DESTROY
 ALL data in the database "%s".
@@ -79,7 +80,7 @@ Type 'yes' to continue, or 'no' to cancel: """ % (settings.DATABASE_NAME,))
             confirm = 'yes'
 
         if confirm != 'yes':
-            print "Reset cancelled."
+            print("Reset cancelled.")
             return
 
         postgis = re.compile('.*postgis')
@@ -151,16 +152,19 @@ Type 'yes' to continue, or 'no' to cancel: """ % (settings.DATABASE_NAME,))
 
             try:
                 cursor.execute(drop_query)
-            except Database.ProgrammingError, e:
+            except Database.ProgrammingError as e:
                 logging.info("Error: %s" % str(e))
 
             # Encoding should be SQL_ASCII (7-bit postgres default) or prefered UTF8 (8-bit)
-            create_query = """CREATE DATABASE %s WITH OWNER = %s ENCODING = 'UTF8' """ % (settings.DATABASE_NAME, settings.DATABASE_USER)
+            create_query = "CREATE DATABASE %s" % settings.DATABASE_NAME
+            if settings.DATABASE_USER:
+                create_query += " WITH OWNER = %s " % settings.DATABASE_USER
+            create_query += " ENCODING = 'UTF8'"
 
             if postgis.match(engine):
-                create_query += 'TEMPLATE = template_postgis '
+                create_query += ' TEMPLATE = template_postgis'
             if settings.DEFAULT_TABLESPACE:
-                create_query += 'TABLESPACE = %s;' % (settings.DEFAULT_TABLESPACE)
+                create_query += ' TABLESPACE = %s;' % settings.DEFAULT_TABLESPACE
             else:
                 create_query += ';'
             logging.info('Executing... "' + create_query + '"')
@@ -170,4 +174,4 @@ Type 'yes' to continue, or 'no' to cancel: """ % (settings.DATABASE_NAME,))
             raise CommandError("Unknown database engine %s" % engine)
 
         if verbosity >= 2 or options.get('interactive'):
-            print "Reset successful."
+            print("Reset successful.")

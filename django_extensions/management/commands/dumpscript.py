@@ -31,13 +31,20 @@ Improvements:
 """
 
 import sys
+import datetime
+import six
+
 import django
 from django.db.models import AutoField, BooleanField, FileField, ForeignKey
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.management.base import BaseCommand
-from django.utils.encoding import smart_unicode, force_unicode
+
+# conditional import, force_unicode was renamed in Django 1.5
 from django.contrib.contenttypes.models import ContentType
-import datetime
+try:
+    from django.utils.encoding import smart_unicode, force_unicode  # NOQA
+except ImportError:
+    from django.utils.encoding import smart_text as smart_unicode, force_text as force_unicode  # NOQA
 
 
 def orm_item_locator(orm_obj):
@@ -63,7 +70,7 @@ def orm_item_locator(orm_obj):
 
     for key in clean_dict:
         v = clean_dict[key]
-        if v is not None and not isinstance(v, (basestring, int, long, float, datetime.datetime)):
+        if v is not None and not isinstance(v, (six.string_types, six.integer_types, float, datetime.datetime)):
             clean_dict[key] = u"%s" % v
 
     output = """ locate_object(%s, "%s", %s, "%s", %s, %s ) """ % (
@@ -257,7 +264,7 @@ class InstanceCode(Code):
         # Print the save command for our new object
         # e.g. model_name_35.save()
         if code_lines:
-            code_lines.append("%s.save()\n" % (self.variable_name))
+            code_lines.append("%s = save_or_locate(%s)\n" % (self.variable_name, self.variable_name))
 
         code_lines += self.get_many_to_many_lines(force=force)
 
@@ -504,8 +511,15 @@ class Script(Code):
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# This file has been automatically generated, changes may be lost if you
-# go and generate it again. It was generated with the following command:
+# This file has been automatically generated.
+# Instead of changing it, create a file called import_helper.py
+# which this script has hooks to.
+#
+# On that file, don't forget to add the necessary Django imports
+# and take a look at how locate_object() and save_or_locate()
+# are implemented here and expected to behave.
+#
+# This file was generated with the following command:
 # %s
 #
 # to restore it, run
@@ -515,6 +529,14 @@ class Script(Code):
 # and the script is at ./some_folder/some_script.py
 # you must make sure ./some_folder/__init__.py exists
 # and run  ./manage.py runscript some_folder.some_script
+
+
+IMPORT_HELPER_AVAILABLE = False
+try:
+    import import_helper
+    IMPORT_HELPER_AVAILABLE = True
+except ImportError:
+    pass
 
 import datetime
 from decimal import Decimal
@@ -549,9 +571,19 @@ def run():
         #if the_class == StaffGroup:
         #    pk_value=8
 
+
+        if IMPORT_HELPER_AVAILABLE and hasattr(import_helper, "locate_object"):
+            return import_helper.locate_object(original_class, original_pk_name, the_class, pk_name, pk_value, obj_content)
+
         search_data = { pk_name: pk_value }
         the_obj =the_class.objects.get(**search_data)
-        #print the_obj
+        return the_obj
+
+    def save_or_locate(the_obj):
+        if IMPORT_HELPER_AVAILABLE and hasattr(import_helper, "save_or_locate"):
+            the_obj = import_helper.save_or_locate(the_obj)
+        else:
+            the_obj.save()
         return the_obj
 
 """
@@ -572,7 +604,7 @@ def flatten_blocks(lines, num_indents=-1):
         return ""
 
     # If this is a string, add the indentation and finish here
-    if isinstance(lines, basestring):
+    if isinstance(lines, six.string_types):
         return INDENTATION * num_indents + lines
 
     # If this is not a string, join the lines and recurse

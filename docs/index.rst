@@ -39,16 +39,17 @@ Contents
 .. toctree::
    :maxdepth: 3
 
-   admin_extensions
-   command_extension_ideas
+   installation_instructions
    command_extensions
+   command_extension_ideas
+   admin_extensions
    shell_plus
    create_app
    dumpscript
+   runscript
    export_emails
    field_extensions
    graph_models
-   installation_instructions
    jobs_scheduling
    model_extensions
    namespace_proposal

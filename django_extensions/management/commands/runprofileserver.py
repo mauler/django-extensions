@@ -18,7 +18,7 @@ import sys
 try:
     from django.contrib.staticfiles.handlers import StaticFilesHandler
     USE_STATICFILES = 'django.contrib.staticfiles' in settings.INSTALLED_APPS
-except ImportError, e:
+except ImportError as e:
     USE_STATICFILES = False
 
 try:
@@ -48,7 +48,7 @@ class KCacheGrind(object):
 
     def output(self, out_file):
         self.out_file = out_file
-        print >> out_file, 'events: Ticks'
+        self.out_file.write('events: Ticks\n')
         self._print_summary()
         for entry in self.data:
             self._entry(entry)
@@ -58,7 +58,7 @@ class KCacheGrind(object):
         for entry in self.data:
             totaltime = int(entry.totaltime * 1000)
             max_cost = max(max_cost, totaltime)
-        print >> self.out_file, 'summary: %d' % (max_cost,)
+        self.out_file.write('summary: %d\n' % (max_cost,))
 
     def _entry(self, entry):
         out_file = self.out_file
@@ -66,16 +66,16 @@ class KCacheGrind(object):
         code = entry.code
         #print >> out_file, 'ob=%s' % (code.co_filename,)
         if isinstance(code, str):
-            print >> out_file, 'fi=~'
+            out_file.write('fi=~\n')
         else:
-            print >> out_file, 'fi=%s' % (code.co_filename,)
-        print >> out_file, 'fn=%s' % (label(code),)
+            out_file.write('fi=%s\n' % (code.co_filename,))
+        out_file.write('fn=%s\n' % (label(code),))
 
         inlinetime = int(entry.inlinetime * 1000)
         if isinstance(code, str):
-            print >> out_file, '0 ', inlinetime
+            out_file.write('0  %s\n' % inlinetime)
         else:
-            print >> out_file, '%d %d' % (code.co_firstlineno, inlinetime)
+            out_file.write('%d %d\n' % (code.co_firstlineno, inlinetime))
 
         # recursive calls are counted in entry.calls
         if entry.calls:
@@ -90,23 +90,22 @@ class KCacheGrind(object):
 
         for subentry in calls:
             self._subentry(lineno, subentry)
-        print >> out_file
+        out_file.write("\n")
 
     def _subentry(self, lineno, subentry):
         out_file = self.out_file
         code = subentry.code
-        #print >> out_file, 'cob=%s' % (code.co_filename,)
-        print >> out_file, 'cfn=%s' % (label(code),)
+        #out_file.write('cob=%s\n' % (code.co_filename,))
+        out_file.write('cfn=%s\n' % (label(code),))
         if isinstance(code, str):
-            print >> out_file, 'cfi=~'
-            print >> out_file, 'calls=%d 0' % (subentry.callcount,)
+            out_file.write('cfi=~\n')
+            out_file.write('calls=%d 0\n' % (subentry.callcount,))
         else:
-            print >> out_file, 'cfi=%s' % (code.co_filename,)
-            print >> out_file, 'calls=%d %d' % (
-                subentry.callcount, code.co_firstlineno)
+            out_file.write('cfi=%s\n' % (code.co_filename,))
+            out_file.write('calls=%d %d\n' % (subentry.callcount, code.co_firstlineno))
 
         totaltime = int(subentry.totaltime * 1000)
-        print >> out_file, '%d %d' % (lineno, totaltime)
+        out_file.write('%d %d\n' % (lineno, totaltime))
 
 
 class Command(BaseCommand):
@@ -181,7 +180,7 @@ class Command(BaseCommand):
                     import cProfile
                     USE_CPROFILE = True
                 except ImportError:
-                    print "cProfile disabled, module cannot be imported!"
+                    print("cProfile disabled, module cannot be imported!")
                     USE_CPROFILE = False
             if USE_LSPROF and not USE_CPROFILE:
                 raise SystemExit("Kcachegrind compatible output format required cProfile from Python 2.5")
@@ -223,7 +222,7 @@ class Command(BaseCommand):
                         elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
                         if USE_LSPROF:
                             kg = KCacheGrind(prof)
-                            kg.output(file(profname, 'w'))
+                            kg.output(open(profname, 'w'))
                         elif USE_CPROFILE:
                             prof.dump_stats(profname)
                         profname2 = "%s.%06dms.%d.prof" % (path_name, elapms, time.time())
@@ -233,11 +232,11 @@ class Command(BaseCommand):
                         os.rename(profname, profname2)
                 return handler
 
-            print "Validating models..."
+            print("Validating models...")
             self.validate(display_num_errors=True)
-            print "\nDjango version %s, using settings %r" % (django.get_version(), settings.SETTINGS_MODULE)
-            print "Development server is running at http://%s:%s/" % (addr, port)
-            print "Quit the server with %s." % quit_command
+            print("\nDjango version %s, using settings %r" % (django.get_version(), settings.SETTINGS_MODULE))
+            print("Development server is running at http://%s:%s/" % (addr, port))
+            print("Quit the server with %s." % quit_command)
             path = options.get('admin_media_path', '')
             if not path:
                 admin_media_path = os.path.join(django.__path__[0], 'contrib/admin/static/admin')
@@ -256,7 +255,7 @@ class Command(BaseCommand):
                         handler = StaticFilesHandler(handler)
                 handler = make_profiler_handler(handler)
                 run(addr, int(port), handler)
-            except WSGIServerException, e:
+            except WSGIServerException as e:
                 # Use helpful error messages instead of ugly tracebacks.
                 ERRORS = {
                     13: "You don't have permission to access that port.",
@@ -272,7 +271,7 @@ class Command(BaseCommand):
                 os._exit(1)
             except KeyboardInterrupt:
                 if shutdown_message:
-                    print shutdown_message
+                    print(shutdown_message)
                 sys.exit(0)
         if use_reloader:
             from django.utils import autoreload

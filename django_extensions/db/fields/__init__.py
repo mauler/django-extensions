@@ -1,10 +1,8 @@
 """
 Django Extensions additional model fields
 """
-
-from django.template.defaultfilters import slugify
-from django.db.models import DateTimeField, CharField, SlugField
 import re
+import six
 
 try:
     import uuid
@@ -12,12 +10,20 @@ try:
 except ImportError:
     from django_extensions.utils import uuid
 
+from django.template.defaultfilters import slugify
+from django.db.models import DateTimeField, CharField, SlugField
+
 try:
     from django.utils.timezone import now as datetime_now
     assert datetime_now
 except ImportError:
     import datetime
     datetime_now = datetime.datetime.now
+
+try:
+    from django.utils.encoding import force_unicode  # NOQA
+except ImportError:
+    from django.utils.encoding import force_text as force_unicode  # NOQA
 
 
 class AutoSlugField(SlugField):
@@ -67,6 +73,12 @@ class AutoSlugField(SlugField):
         value = re.sub('%s+' % re_sep, self.separator, value)
         return re.sub(r'^%s+|%s+$' % (re_sep, re_sep), '', value)
 
+    def get_queryset(self, model_cls, slug_field):
+        for field, model in model_cls._meta.get_fields_with_model():
+            if model and field == slug_field:
+                return model._default_manager.all()
+        return model_cls._default_manager.all()
+
     def slugify_func(self, content):
         if content:
             return slugify(content)
@@ -103,7 +115,7 @@ class AutoSlugField(SlugField):
 
         # exclude the current model instance from the queryset used in finding
         # the next valid slug
-        queryset = model_instance.__class__._default_manager.all()
+        queryset = self.get_queryset(model_instance.__class__, slug_field)
         if model_instance.pk:
             queryset = queryset.exclude(pk=model_instance.pk)
 
@@ -130,7 +142,7 @@ class AutoSlugField(SlugField):
         return slug
 
     def pre_save(self, model_instance, add):
-        value = unicode(self.create_slug(model_instance, add))
+        value = force_unicode(self.create_slug(model_instance, add))
         setattr(model_instance, self.attname, value)
         return value
 
@@ -209,14 +221,14 @@ class UUIDVersionError(Exception):
 class UUIDField(CharField):
     """ UUIDField
 
-    By default uses UUID version 1 (generate from host ID, sequence number and current time)
+    By default uses UUID version 4 (generate from host ID, sequence number and current time)
 
     The field support all uuid versions which are natively supported by the uuid python module.
     For more information see: http://docs.python.org/lib/module-uuid.html
     """
 
     def __init__(self, verbose_name=None, name=None, auto=True, version=1, node=None, clock_seq=None, namespace=None, **kwargs):
-        kwargs['max_length'] = 36
+        kwargs.setdefault('max_length', 36)
         if auto:
             self.empty_strings_allowed = False
             kwargs['blank'] = True
@@ -260,19 +272,19 @@ class UUIDField(CharField):
     def pre_save(self, model_instance, add):
         value = super(UUIDField, self).pre_save(model_instance, add)
         if self.auto and add and value is None:
-            value = unicode(self.create_uuid())
+            value = force_unicode(self.create_uuid())
             setattr(model_instance, self.attname, value)
             return value
         else:
             if self.auto and not value:
-                value = unicode(self.create_uuid())
+                value = six.u(self.create_uuid())
                 setattr(model_instance, self.attname, value)
         return value
 
     def formfield(self, **kwargs):
         if self.auto:
             return None
-        super(UUIDField, self).formfield(**kwargs)
+        return super(UUIDField, self).formfield(**kwargs)
 
     def south_field_triple(self):
         "Returns a suitable description of this field for South."

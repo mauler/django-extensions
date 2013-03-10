@@ -52,7 +52,7 @@ def extract_views_from_urlpatterns(urlpatterns, base=''):
 
 
 class Command(BaseCommand):
-    options_list = BaseCommand.option_list + (
+    option_list = BaseCommand.option_list + (
         make_option("--unsorted", "-u", action="store_true", dest="unsorted",
                     help="Show urls unsorted but same order as found in url patterns"),
     )
@@ -76,11 +76,11 @@ class Command(BaseCommand):
         for settings_mod in settings_modules:
             try:
                 urlconf = __import__(settings_mod.ROOT_URLCONF, {}, {}, [''])
-            except Exception, e:
+            except Exception as e:
                 if options.get('traceback', None):
                     import traceback
                     traceback.print_exc()
-                print style.ERROR("Error occurred while trying to load %s: %s" % (settings_mod.ROOT_URLCONF, str(e)))
+                print(style.ERROR("Error occurred while trying to load %s: %s" % (settings_mod.ROOT_URLCONF, str(e))))
                 continue
             view_functions = extract_views_from_urlpatterns(urlconf.urlpatterns)
             for (func, regex, url_name) in view_functions:
@@ -96,6 +96,8 @@ class Command(BaseCommand):
                     'url_name': style.URL_NAME(url_name or ''),
                     'url': style.URL(simplify_regex(regex))
                 })
-        if not getattr(options, 'unsorted', False):
+
+        if not options.get('unsorted', False):
             views = sorted(views)
+
         return "\n".join([v for v in views]) + "\n"
